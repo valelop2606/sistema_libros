@@ -209,3 +209,15 @@ no sobrescribir el archivo y permitir inspeccionarlo manualmente. **Si** el arch
 4. **Opinión larga obligatoria u opcional**: provisionalmente opcional, para no bloquear el cierre
    de la lectura con una calificación válida.
 5. **Reabrir una sesión completada**: provisionalmente prohibido; se corrige iniciando otra sesión.
+
+## 8. Criterios de finalización del MVP
+El MVP se considera terminado solo cuando se cumplen todos estos criterios:
+- [ ] **CF-01** Los 20 RF están implementados y cada uno tiene al menos una prueba automatizada en verde (trazabilidad RF → prueba).
+- [ ] **CF-02** Las 7 historias de usuario superan sus pruebas independientes de extremo a extremo.
+- [ ] **CF-03** El dominio no depende de la interfaz ni del almacenamiento, y no duplica reglas de negocio en la CLI.
+- [ ] **CF-04** Cobertura ≥90 % de líneas en dominio y aplicación, y 100 % de ramas en porcentaje y derivación de estado.
+- [ ] **CF-05** Los datos sobreviven entre ejecuciones; un archivo corrupto o con versión desconocida se informa sin sobrescribirse.
+- [ ] **CF-06** Búsqueda sin acentos, filtros y los tres órdenes funcionan; los libros archivados no aparecen en ninguna consulta.
+- [ ] **CF-07** El flujo completo funciona en Windows con ruta que contiene espacios y acentos, y sin archivo de datos previo.
+- [ ] **CF-08** `constitution.md`, `spec.md`, `plan.md` y `tasks.md` son consistentes: no hay requisito sin decisión ni decisión que contradiga la constitución.
+
