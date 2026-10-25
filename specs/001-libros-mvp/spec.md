@@ -33,6 +33,7 @@ fechadas. No requiere cuentas, red ni servicios externos.
   *Prueba independiente:* búsqueda "garcia marquez" encuentra "García Márquez" sin distinguir acentos.
 - **US-07 (P3) — Conservar el historial.** Como dueña/o quiero archivar libros que ya no
   quiero ver sin perder sus lecturas, reseñas y notas.
+  *Prueba independiente:* archivar un libro leído → desaparece de la lista y sus datos siguen almacenados.
 
 ## 4. Requisitos funcionales (EARS)
 
@@ -49,19 +50,24 @@ total de páginas obligatorios, y editorial, año y género opcionales.
   **entonces** el sistema deberá rechazar el alta o la edición indicando el límite.
 - **Si** el total de páginas no es un entero entre 1 y 20 000, **entonces** el sistema deberá
   rechazarlo.
-- **Si** el año no es un entero entre 1 y el año actual, **entonces** el sistema deberá rechazarlo.
+- **Si** el año se informa y no es un entero entre 1 y el año actual, **entonces** el sistema
+  deberá rechazarlo.
+- **Si** editorial, año o género se dejan vacíos, **entonces** el sistema deberá aceptarlos como
+  datos ausentes sin validar rango ni longitud.
 - Los libros con mismo título y autor deberán poder registrarse por separado.
 
 **RF-003 — Edición.** El sistema deberá permitir editar los metadatos de un libro activo.
 - **Cuando** se modifiquen campos válidos, **el sistema deberá** guardar los cambios y actualizar
   la fecha de última actividad.
-- **Si** se reduce el total de páginas por debajo de una página ya registrada, **entonces** el
-  sistema deberá aceptar el cambio, recalcular porcentajes y limitar a 100 los que excedan;
-  las lecturas completadas conservan su estado `completada`.
+- **Si** el nuevo total de páginas es menor que la página actual de la sesión activa, **entonces**
+  el sistema deberá rechazar la edición e indicar que primero se ajuste la página de la sesión.
+- Las lecturas completadas conservan su estado `completada` y su página registrada aunque el
+  nuevo total sea menor.
 
-**RF-004 — Estado derivado.** El sistema deberá mostrar un único estado por libro, con esta
+**RF-004 — Estado derivado.** El sistema deberá manejar un único estado por libro, con esta
 precedencia: `archivado`; si no, `leyendo` si existe una sesión activa; si no, `leído` si hay
-al menos una lectura completada; si no, `pendiente`.
+al menos una lectura completada; si no, `pendiente`. `archivado` es un estado interno que oculta
+el libro; los estados visibles en listados son `pendiente`, `leyendo` y `leído`.
 
 ### 4.2 Lectura y progreso
 **RF-005 — Iniciar lectura.** El sistema deberá permitir iniciar una sesión de lectura.
@@ -74,6 +80,8 @@ al menos una lectura completada; si no, `pendiente`.
 
 **RF-006 — Actualizar página.** El sistema deberá permitir fijar la página actual de la sesión
 activa.
+- **Si** no existe una sesión activa, **entonces** el sistema deberá rechazar el cambio e indicar
+  que se inicie una lectura.
 - **Si** la página no es un entero entre 0 y el total de páginas, **entonces** el sistema deberá
   rechazarla sin modificar el progreso.
 - **Cuando** la página sea menor que la actual, **el sistema deberá** aceptar el retroceso
@@ -82,11 +90,12 @@ activa.
 **RF-007 — Porcentaje automático.** El sistema deberá calcular el porcentaje de avance de la
 sesión activa como `piso(página_actual × 100 ÷ total_páginas)`, y deberá mostrar 100 únicamente
 cuando la página actual iguale el total. Sin sesión activa: 100 % si hay lecturas completadas,
-0 % si no.
+0 % si no. La página mostrada de un libro deberá ser la de la sesión activa; si no hay sesión
+activa, el total de páginas cuando exista al menos una lectura completada, y 0 en caso contrario.
 
 **RF-008 — Fin automático.** **Cuando** la página actual alcance el total de páginas, **el
 sistema deberá** cerrar la sesión como `completada` con fecha de fin, marcar el libro como
-`leído` y dejarla en estado `pendiente de reseña`.
+`leído` y señalar la sesión como pendiente de reseña.
 - **Mientras** una sesión está `completada`, **el sistema deberá** impedir cambios de página
   en ella; para seguir leyendo deberá iniciarse una nueva sesión.
 
@@ -106,6 +115,7 @@ hasta 2 000 caracteres.
 
 **RF-011 — Reseñas pendientes.** Mientras existan sesiones completadas sin reseña, el sistema
 deberá señalarlo en el detalle del libro y permitir registrarlas en cualquier momento posterior.
+Este indicador es derivado: no modifica el estado del libro ni el de la sesión.
 
 ### 4.4 Notas
 **RF-012 — Notas fechadas.** El sistema deberá permitir agregar notas de texto de hasta 1 000
@@ -142,15 +152,25 @@ reseñas o notas.
   sesión registrada como no completada.
 - El sistema no deberá ofrecer restauración de libros archivados en el MVP.
 
-### 4.7 Persistencia
+### 4.7 Detalle e historial
+**RF-020 — Detalle del libro.** El sistema deberá mostrar el detalle de un libro activo con sus
+metadatos, estado, avance, lecturas completadas y relecturas.
+- **Cuando** se consulte el detalle, **el sistema deberá** listar las sesiones de lectura de la
+  más reciente a la más antigua, con fecha de inicio, fecha de fin, página registrada y si están
+  completadas.
+- El sistema deberá mostrar las reseñas de las sesiones completadas con calificación, opinión y
+  fechas, y las notas del libro de la más reciente a la más antigua.
+- **Si** el libro está archivado, **entonces** el sistema no deberá mostrar su detalle.
+
+### 4.8 Persistencia
 **RF-018 — Persistencia local.** El sistema deberá conservar todos los datos entre ejecuciones
 en un archivo JSON local versionado, y guardar los cambios de forma atómica tras cada operación
-exitosa.
+exitosa, de modo que una escritura interrumpida no corrompa el archivo previo.
 
-**RF-019 — Archivo ilegible.** **Si** el archivo de datos no puede leerse o no cumple el esquema,
-**entonces** el sistema deberá informar el problema, no sobrescribir el archivo y permitir
-inspeccionarlo manualmente. **Si** el archivo no existe, **el sistema deberá** iniciar una
-biblioteca vacía.
+**RF-019 — Archivo ilegible.** **Si** el archivo de datos no puede leerse, no cumple el esquema
+o declara una versión de esquema desconocida, **entonces** el sistema deberá informar el problema,
+no sobrescribir el archivo y permitir inspeccionarlo manualmente. **Si** el archivo no existe,
+**el sistema deberá** iniciar una biblioteca vacía.
 
 ## 5. Casos límite
 | Caso | Comportamiento esperado |
@@ -166,9 +186,9 @@ biblioteca vacía.
 | Nota con página fuera de rango | Rechazo |
 | Búsqueda `garcia` sobre `García` | Coincidencia |
 | Mismo título y autor registrado dos veces | Dos libros independientes |
-| Reducir total de páginas bajo la página actual | Porcentajes recalculados, máx. 100 |
+| Reducir total de páginas bajo la página de la sesión activa | Edición rechazada; las lecturas completadas no se alteran |
 | Archivar libro con lectura activa | Oculto, historial conservado, sin más operaciones |
-| Archivo JSON corrupto | Error legible, archivo no modificado |
+| Archivo JSON corrupto o con versión de esquema desconocida | Error legible, archivo no modificado |
 | Cadena de solo espacios en campos obligatorios | Rechazo |
 
 ## 6. Fuera de alcance (MVP)
